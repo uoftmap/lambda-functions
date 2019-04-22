@@ -5,45 +5,43 @@
 const axios = require("axios");
 
 const {
-  COBALT_KEY, 
-  COBALT_URL, 
-  BUILDINGS_END, 
+  COBALT_GITHUB_ROOT,
+  COBALT_BUILDINGS,
 } = process.env;
 
 
-const BUILDINGS_LIMIT = parseInt(process.env.BUILDINGS_LIMIT);
-const BUILDINGS_STEP = parseInt(process.env.BUILDINGS_STEP);
-
 const fetchBuildings = async () => {
-  const url = `${COBALT_URL}${BUILDINGS_END}`;
-  
-  const fetches = [];
-  
-  for (let i = 0; i < BUILDINGS_LIMIT; i += BUILDINGS_STEP) {
-    const fetch = axios.get(
-      url, {
-        params: {
-          key: COBALT_KEY,
-          limit: BUILDINGS_STEP,
-          skip: i,
-          sort: "+id",
-        }
-      }
-    )
-    
-    console.log(`Sending request ${i}`);
+  const url = `${COBALT_GITHUB_ROOT}${COBALT_BUILDINGS}`;
 
-    fetches.push(fetch);
-  }
+  console.log(`Sending request`);
+  const buildings = await axios.get(url);
 
-  const buildings = await Promise.all(fetches);
-  return buildings.map(res => res.data).reduce(
-    (collect, curr) => {
-      console.log(`Got request size ${curr.length}`);
-      return collect.concat(curr)
-    },
-    []
-  );
+  return buildings.data
+    .split("\n")
+    .filter(str => str.trim().length > 0)
+    .map(building => JSON.parse(building))
+    .reduce(
+      (collect, curr) => {
+        const { id, code, name, short_name, campus, lat, lng, polygon, address } = curr;
+        
+        // Create new entry for the campus
+        if (!(campus in collect)) collect[campus] = [];
+
+        collect[campus].push(
+          {
+            id,
+            code,
+            name,
+            // key value cannot be empty
+            short_name: short_name === "" ? name : short_name,
+            lat,
+            lng
+          });
+        return collect;
+      },
+      {}
+    );
+
 }
 
-module.exports = {fetchBuildings};
+module.exports = { fetchBuildings };
